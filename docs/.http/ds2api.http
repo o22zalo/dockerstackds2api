@@ -1,0 +1,119 @@
+@baseUrl = https://{{$dotenv PROJECT_NAME}}.dpdns.org
+@apiKey = {{$dotenv DS2API_API_KEY}}
+@model = {{$dotenv DS2API_MODEL}}
+
+### Health check
+GET {{baseUrl}}/healthz
+
+
+### Ready check
+GET {{baseUrl}}/readyz
+
+
+### List models
+GET {{baseUrl}}/v1/models
+Authorization: Bearer {{apiKey}}
+
+
+### Chat completions - không stream
+POST {{baseUrl}}/v1/chat/completions
+Authorization: Bearer {{apiKey}}
+Content-Type: application/json
+
+{
+  "model": "{{model}}",
+  "messages": [
+    {
+      "role": "system",
+      "content": "Bạn là trợ lý AI trả lời ngắn gọn, rõ ràng bằng tiếng Việt."
+    },
+    {
+      "role": "user",
+      "content": "Xin chào, hãy giới thiệu ngắn gọn về bạn."
+    }
+  ],
+  "stream": false
+}
+
+
+### Chat completions - stream
+POST {{baseUrl}}/v1/chat/completions
+Authorization: Bearer {{apiKey}}
+Content-Type: application/json
+
+{
+  "model": "{{model}}",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Viết 5 ý tưởng ứng dụng AI cho Trung tâm Phục vụ hành chính công cấp xã."
+    }
+  ],
+  "stream": true
+}
+
+
+### Responses API
+POST {{baseUrl}}/v1/responses
+Authorization: Bearer {{apiKey}}
+Content-Type: application/json
+
+{
+  "model": "{{model}}",
+  "input": "Tóm tắt ngắn gọn lợi ích của chuyển đổi số cấp xã."
+}
+
+
+### Claude compatible
+POST {{baseUrl}}/anthropic/v1/messages
+x-api-key: {{apiKey}}
+anthropic-version: 2023-06-01
+Content-Type: application/json
+
+{
+  "model": "{{model}}",
+  "max_tokens": 1024,
+  "messages": [
+    {
+      "role": "user",
+      "content": "Hãy viết một đoạn giới thiệu ngắn về cải cách thủ tục hành chính."
+    }
+  ]
+}
+
+
+### Gemini compatible
+POST {{baseUrl}}/v1beta/models/{{model}}:generateContent?key={{apiKey}}
+Content-Type: application/json
+
+{
+  "contents": [
+    {
+      "parts": [
+        {
+          "text": "Giải thích ngắn gọn mô hình một cửa điện tử."
+        }
+      ]
+    }
+  ]
+}
+
+
+### Ollama compatible - list models
+GET {{baseUrl}}/api/tags
+
+
+### Ollama compatible - chat
+POST {{baseUrl}}/api/chat
+Content-Type: application/json
+
+{
+  "model": "{{model}}",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Xin chào, kiểm tra API Ollama compatible."
+    }
+  ],
+  "stream": false
+}
