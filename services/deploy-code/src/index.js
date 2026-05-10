@@ -766,7 +766,7 @@ function responseText(res, status, text) {
 function staticRelativePath(urlPath) {
   if (urlPath === '/' || urlPath === '/ui' || urlPath === '/ui/') return 'index.html';
   if (urlPath.startsWith('/ui/')) return urlPath.slice('/ui/'.length);
-  if (urlPath.startsWith('/assets/')) return urlPath.slice(1);
+  if (urlPath.startsWith('/assets/')) return urlPath.slice('/assets/'.length);
   return '';
 }
 
