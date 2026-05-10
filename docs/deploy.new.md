@@ -18,16 +18,16 @@ Ket qua: `/opt/stacks/service-b` chua ban sao repo (da bo `.git`).
 
 ## Buoc 2 — Thay app
 
-### Cach A: giu cau truc `services/app`
-- Sua `services/app/Dockerfile`
-- Sua `services/app/package.json`, code app.
-- Giu `compose.apps.yml` gan nhu nguyen trang.
-
-### Cach B: dung image co san
+### Cach A: dung image co san
 - Sua service `app` trong `compose.apps.yml`:
   - doi `image` sang image thuc te.
-  - bo/dieu chinh `build`.
   - map lai `APP_PORT` neu khac.
+  - them env/volume/healthcheck cua app moi.
+
+### Cach B: them source app rieng neu can build local
+- Tao thu muc source rieng cho app.
+- Them `build` vao service `app` trong `compose.apps.yml`.
+- Van giu service name la `app`.
 
 ## Buoc 3 — Chuan hoa data vao `.docker-volumes`
 

@@ -99,6 +99,15 @@ function checkOptional(key, desc, validate) {
   ok.push(`${key}=OK (optional)`);
 }
 
+function isValidBase64Json(v) {
+  try {
+    JSON.parse(Buffer.from(v, "base64").toString("utf8"));
+    return null;
+  } catch {
+    return "must be base64-encoded JSON";
+  }
+}
+
 function isValidDomain(v) {
   if (v.startsWith("http://") || v.startsWith("https://")) return "must not include http/https";
   if (v.endsWith("/")) return "must not end with /";
@@ -136,6 +145,8 @@ checkRequired("CADDY_AUTH_HASH", "basic auth bcrypt hash", (v) => {
   return raw.startsWith("$2a$") || raw.startsWith("$2b$") ? null : "must be bcrypt hash ($2a$/$2b$...)";
 });
 checkPort("APP_PORT", true);
+checkRequired("DS2API_ADMIN_KEY", "DS2API admin key");
+checkRequired("DS2API_CONFIG_JSON", "base64-encoded DS2API config.json", isValidBase64Json);
 
 // 2) Optional env from compose files
 checkPort("APP_HOST_PORT", false);
@@ -144,6 +155,11 @@ checkPort("FILEBROWSER_HOST_PORT", false);
 checkPort("WEBSSH_HOST_PORT", false);
 checkOptional("NODE_ENV", "app runtime env");
 checkOptional("HEALTH_PATH", "health endpoint path", (v) => (v.startsWith("/") ? null : "must start with '/'"));
+checkOptional("DS2API_TZ", "DS2API timezone");
+checkOptional("DS2API_LOG_LEVEL", "DS2API log level");
+checkOptional("DS2API_CONFIG_PATH", "DS2API config path");
+checkOptional("DS2API_API_KEY", "DS2API client API key");
+checkOptional("DS2API_MODEL", "DS2API default model");
 checkOptional("DOCKER_SOCK", "docker socket path override");
 checkPort("DOCKER_DEPLOY_CODE_PORT", false);
 checkPort("DOCKER_DEPLOY_CODE_HOST_PORT", false);

@@ -34,7 +34,7 @@ Tài liệu triển khai chuẩn theo **codebase hiện tại**.
 
 ### Apps
 - `compose.apps.yml`
-- Service `app` mặc định build từ `services/app`.
+- Service `app` hiện chạy image DS2API cấu hình trong `compose.apps.yml`.
 
 ## 3) Các env bắt buộc (hard-stop)
 
@@ -69,8 +69,9 @@ Nếu `TAILSCALE_KEEP_IP_REMOVE_HOSTNAME_ENABLE=true`, bắt buộc thêm:
 ## 4) Các env optional nhưng nên cấu hình
 
 - `APP_HOST_PORT`: mở truy cập localhost trực tiếp.
-- `NODE_ENV`: mặc định `production`.
-- `HEALTH_PATH`: mặc định `/health`.
+- `HEALTH_PATH`: mặc định `/healthz` cho DS2API.
+- `DS2API_CONFIG_JSON`: config DS2API dạng base64 JSON.
+- `DS2API_ADMIN_KEY`: admin key của DS2API.
 - `DOCKER_SOCK`: đường dẫn docker socket nếu khác mặc định.
 - `TAILSCALE_TAGS`: mặc định `tag:container`.
 - `TAILSCALE_KEEP_IP_INTERVAL_SEC`: mặc định `30`.

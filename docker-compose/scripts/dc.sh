@@ -81,6 +81,7 @@ prepare_docker_volume_dirs() {
   volume_root="$(resolve_host_path "${DOCKER_VOLUMES_ROOT:-./.docker-volumes}")"
 
   mkdir -p \
+    "$volume_root/app/data" \
     "$volume_root/app/logs" \
     "$volume_root/caddy/data" \
     "$volume_root/caddy/config" \
