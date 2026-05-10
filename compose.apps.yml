@@ -12,7 +12,7 @@
 
 services:
   app:
-    container_name: "[main-app]"
+    container_name: "main-app"
     image: ghcr.io/cjackhwang/ds2api:latest
     # Compose vẫn ưu tiên giá trị khai báo explicit trong environment bên dưới.
     env_file:
