@@ -81,14 +81,14 @@ services:
       # - "caddy=http://assets.${DOCKER_DEPLOY_CODE_CADDY_HOSTS:-deploy.localhost}"
       # - "caddy.reverse_proxy={{upstreams ${DOCKER_DEPLOY_CODE_PORT:-53999}}}"
       # Route assets without Basic Auth so static CSS/JS can load before login prompts.
-      # Route assets without Basic Auth so static CSS/JS can load before login prompts.
-      - "caddy.0_handle=/assets/*"
-      - "caddy.0_handle.0_reverse_proxy={{upstreams ${DOCKER_DEPLOY_CODE_PORT:-53999}}}"
+      - "caddy=http://${DOCKER_DEPLOY_CODE_CADDY_HOSTS:-deploy.localhost}"
+      - "caddy.handle_0=/assets/*"
+      - "caddy.handle_0.reverse_proxy={{upstreams ${DOCKER_DEPLOY_CODE_PORT:-53999}}}"
       # Route all other paths through Basic Auth.
-      - "caddy.1_handle=/*"
-      - "caddy.1_handle.0_basic_auth=/*"
-      - "caddy.1_handle.0_basic_auth.${CADDY_AUTH_USER:-admin}=${CADDY_AUTH_HASH}"
-      - "caddy.1_handle.1_reverse_proxy={{upstreams ${DOCKER_DEPLOY_CODE_PORT:-53999}}}"
+      - "caddy.handle_1=/*"
+      - "caddy.handle_1.basic_auth=/*"
+      - "caddy.handle_1.basic_auth.${CADDY_AUTH_USER:-admin}=${CADDY_AUTH_HASH}"
+      - "caddy.handle_1.reverse_proxy={{upstreams ${DOCKER_DEPLOY_CODE_PORT:-53999}}}"
     networks: [app_net]
     restart: unless-stopped
     healthcheck:
