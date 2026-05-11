@@ -85,6 +85,7 @@ prepare_docker_volume_dirs() {
     "$volume_root/app/logs" \
     "$volume_root/caddy/data" \
     "$volume_root/caddy/config" \
+    "$volume_root/tinyauth/data" \
     "$volume_root/filebrowser/database" \
     "$volume_root/tailscale/var-lib" \
     "$volume_root/deploy-code/logs" \

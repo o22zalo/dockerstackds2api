@@ -2,6 +2,8 @@ tunnel: 49f98be7-61f0-4364-b076-f34bba5cccd7
 credentials-file: /etc/cloudflared/credentials.json
 
 ingress:
+  - hostname: auth.dockerstackds2api.dpdns.org
+    service: http://caddy:80
   - hostname: dockerstackds2api.dpdns.org
     service: http://caddy:80
   - hostname: main.dockerstackds2api.dpdns.org

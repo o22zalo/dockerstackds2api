@@ -73,8 +73,7 @@ services:
     labels:
       # Protect the whole deploy UI with one Caddy Basic Auth challenge.
       - "caddy=http://${DOCKER_DEPLOY_CODE_CADDY_HOSTS:-deploy.localhost}"
-      - "caddy.basic_auth=/*"
-      - "caddy.basic_auth.${CADDY_AUTH_USER:-admin}=${CADDY_AUTH_HASH}"
+      - "caddy.import=tinyauth_forwarder *"
       - "caddy.reverse_proxy={{upstreams ${DOCKER_DEPLOY_CODE_PORT:-53999}}}"
     networks: [app_net]
     restart: unless-stopped

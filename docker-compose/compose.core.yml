@@ -28,10 +28,40 @@ services:
     labels:
       caddy.email: "${CADDY_EMAIL}"
       caddy.auto_https: "disable_redirects"
+      # ── Tinyauth forward_auth snippet (reusable) ──
+      caddy_0: "(tinyauth_forwarder)"
+      caddy_0.forward_auth: "tinyauth:3000"
+      caddy_0.forward_auth.uri: "/api/auth/caddy"
     networks: [app_net]
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:80"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ── Tinyauth: lightweight auth gateway with persistent sessions ─
+  tinyauth:
+    container_name: "tinyauth"
+    image: ghcr.io/steveiliop56/tinyauth:v5
+    environment:
+      TINYAUTH_APPURL: "https://auth.${DOMAIN}"
+      TINYAUTH_AUTH_USERS: "${TINYAUTH_AUTH_USERS}"
+      TINYAUTH_SECRET: "${TINYAUTH_SECRET}"
+      TINYAUTH_AUTH_SESSIONEXPIRY: "${TINYAUTH_AUTH_SESSION_EXPIRY_SEC:-604800}"
+      TINYAUTH_DATABASE_PATH: "/data/tinyauth.db"
+      TINYAUTH_ANALYTICS_ENABLED: "false"
+      TINYAUTH_LOG_LEVEL: "info"
+    volumes:
+      - ${DOCKER_VOLUMES_ROOT:-./.docker-volumes}/tinyauth/data:/data
+    labels:
+      - "caddy=http://auth.${DOMAIN}"
+      - "caddy.reverse_proxy={{upstreams 3000}}"
+    networks: [app_net]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/healthcheck"]
       interval: 30s
       timeout: 5s
       retries: 3
