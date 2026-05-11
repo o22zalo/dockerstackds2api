@@ -137,10 +137,20 @@ function renderStatus() {
   els.runningBadge.textContent = data.running ? 'Running' : 'Idle';
   els.runningBadge.className = `badge ${data.running ? 'warn' : 'ok'}`;
 
+  let sourceType = data.lastRun?.type;
+  if (!sourceType) {
+    if (data.git?.isZip) sourceType = 'zip';
+    else if (data.git?.hasGitRepo) sourceType = 'git';
+  }
+
+  const sourceLabel = sourceType === 'zip' ? 'ZIP Upload' : (sourceType === 'git' ? 'Git' : 'Unknown');
+  const sourceClass = sourceType === 'zip' ? 'warn' : (sourceType === 'git' ? 'ok' : 'neutral');
+
   els.statusGrid.replaceChildren(
+    metric('Source', `<span class="badge ${sourceClass}">${sourceLabel}</span>`),
     metric('Repo', cfg.repoDir),
     metric('Branch', `${cfg.remote || 'origin'}/${cfg.branch || 'main'}`),
-    metric('Local', short(data.git?.localCommit || data.git?.error || '')),
+    metric('Local', short(data.git?.localCommit || data.git?.envCommitId || data.git?.error || '')),
     metric('Remote', short(data.git?.remoteCommit || '')),
     metric('Services', (cfg.deployServices || []).join(', ')),
     metric('Allowlist', (cfg.serviceAllowlist || []).join(', ')),

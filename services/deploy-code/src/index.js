@@ -230,14 +230,49 @@ async function hasGitRepo(cfg = config()) {
   }
 }
 
+async function getEnvCommitId(cfg = config()) {
+  try {
+    const text = await fsp.readFile(cfg.envFile, 'utf8');
+    const lines = text.split(/\r?\n/);
+    const key = cfg.envCommitIdKey;
+    const line = lines.find((l) => l.startsWith(`${key}=`));
+    return line ? line.split('=')[1].trim() : '';
+  } catch (_err) {
+    return '';
+  }
+}
+
 async function commitInfo(cfg = config()) {
   const inside = await hasGitRepo(cfg);
-  if (!inside) return { hasGitRepo: false, localCommit: '', localShortCommit: '', branch: cfg.branch, remoteCommit: '', remoteShortCommit: '' };
+  const envCommitId = await getEnvCommitId(cfg);
+  const isZip = envCommitId.startsWith('zip-');
+
+  if (!inside) {
+    return {
+      hasGitRepo: false,
+      isZip,
+      envCommitId,
+      localCommit: isZip ? envCommitId : '',
+      localShortCommit: isZip ? envCommitId.slice(0, 16) : '',
+      branch: cfg.branch,
+      remoteCommit: '',
+      remoteShortCommit: '',
+    };
+  }
   const localCommit = await gitText(['rev-parse', 'HEAD'], cfg).catch(() => '');
   const localShortCommit = await gitText(['rev-parse', '--short', 'HEAD'], cfg).catch(() => '');
   const remoteCommit = await gitText(['rev-parse', `${cfg.remote}/${cfg.branch}`], cfg).catch(() => '');
   const remoteShortCommit = remoteCommit ? remoteCommit.slice(0, 7) : '';
-  return { hasGitRepo: true, localCommit, localShortCommit, branch: cfg.branch, remoteCommit, remoteShortCommit };
+  return {
+    hasGitRepo: true,
+    isZip,
+    envCommitId,
+    localCommit,
+    localShortCommit,
+    branch: cfg.branch,
+    remoteCommit,
+    remoteShortCommit,
+  };
 }
 
 function safeEnvLine(key, value) {
