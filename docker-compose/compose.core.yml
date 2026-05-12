@@ -53,6 +53,7 @@ services:
       TINYAUTH_DATABASE_PATH: "/data/tinyauth.db"
       TINYAUTH_ANALYTICS_ENABLED: "false"
       TINYAUTH_LOG_LEVEL: "info"
+      TINYAUTH_UI_WARNINGSENABLED: "false"
     volumes:
       - ${DOCKER_VOLUMES_ROOT:-./.docker-volumes}/tinyauth/data:/data
     labels:
