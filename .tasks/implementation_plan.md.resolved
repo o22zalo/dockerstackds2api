@@ -1,0 +1,243 @@
+# Thay thế Caddy Basic Auth bằng Tinyauth — Session Cookie bền vững
+
+## Bối cảnh
+
+Hiện tại, dự án dùng `basic_auth` của Caddy để bảo vệ các service ops (dozzle, filebrowser, webssh, deploy-code). Basic Auth là **stateless** — trình duyệt lưu credentials tạm thời trong bộ nhớ và **xóa khi đóng tab/browser**. Khi server restart, user phải nhập lại mật khẩu.
+
+**Caddy không hỗ trợ session/cookie gốc.** Giải pháp chuẩn là dùng `forward_auth` + một auth provider bên ngoài.
+
+## Giải pháp: Tinyauth
+
+**[Tinyauth](https://tinyauth.app)** là auth gateway cực nhẹ (~20MB image) hỗ trợ:
+- ✅ Form-based login với giao diện đẹp
+- ✅ Cookie-based sessions bền vững qua browser restart
+- ✅ SQLite database lưu sessions → **bền vững qua server/container restart** (qua Docker volume)
+- ✅ Cấu hình thời gian session expiry (`TINYAUTH_AUTH_SESSIONEXPIRY`)
+- ✅ Tích hợp sẵn với `caddy-docker-proxy` qua labels (snippet + `forward_auth`)
+- ✅ Dùng bcrypt hash giống Caddy → reuse credential format
+
+### Luồng hoạt động mới
+
+```
+Browser → Cloudflare Tunnel → Caddy (forward_auth check) → Tinyauth
+                                                              ↓
+                                                     Cookie hợp lệ? → cho qua
+                                                     Không? → redirect tới login page (auth.DOMAIN)
+                                                              ↓
+                                                     User đăng nhập → set cookie (configurable expiry)
+                                                              ↓
+                                                     Redirect về trang gốc
+```
+
+---
+
+## User Review Required
+
+> [!IMPORTANT]
+> **Breaking change**: Sau khi áp dụng, tất cả services hiện đang dùng `basic_auth` (dozzle, filebrowser, webssh, deploy-code) sẽ chuyển sang form login của Tinyauth. User sẽ thấy trang login đẹp thay vì popup basic auth của browser.
+
+> [!IMPORTANT]
+> **Subdomain mới**: Cần thêm `auth.dockerstackds2api.dpdns.org` vào Cloudflare Tunnel (cloudflared config) + DNS. Đây là trang login portal của Tinyauth.
+
+> [!WARNING]
+> **Env mới cần set**: `TINYAUTH_AUTH_USERS` và `TINYAUTH_SECRET` phải được set trong `.env` trước khi deploy. Secret là random 32-byte key dùng để sign cookies.
+
+## Open Questions
+
+> [!IMPORTANT]
+> **Thời gian session mặc định**: Tôi sẽ đặt default `TINYAUTH_AUTH_SESSIONEXPIRY=604800` (7 ngày). Bạn muốn thời gian khác không? (Đơn vị: giây. 86400 = 1 ngày, 604800 = 7 ngày, 2592000 = 30 ngày)
+
+> [!IMPORTANT]
+> **Giữ lại basic_auth làm fallback?**: Có muốn giữ lại các dòng `basic_auth` labels dưới dạng comment (để có thể switch lại nếu cần) hay xóa hoàn toàn?
+
+---
+
+## Proposed Changes
+
+### Core Infrastructure — Caddy + Tinyauth
+
+#### [MODIFY] [compose.core.yml](file:///h:/nodejs-tester/dockerstackds2api/docker-compose/compose.core.yml)
+
+1. **Thêm snippet `tinyauth_forwarder`** vào Caddy service labels:
+```yaml
+labels:
+  caddy.email: "${CADDY_EMAIL}"
+  caddy.auto_https: "disable_redirects"
+  # ── Tinyauth forward_auth snippet (reusable) ──
+  caddy_0: "(tinyauth_forwarder)"
+  caddy_0.forward_auth: "tinyauth:3000"
+  caddy_0.forward_auth.uri: "/api/auth/caddy"
+```
+
+2. **Thêm Tinyauth service** mới:
+```yaml
+  # ── Tinyauth: lightweight auth gateway with persistent sessions ─
+  tinyauth:
+    container_name: "tinyauth"
+    image: ghcr.io/steveiliop56/tinyauth:v5
+    environment:
+      TINYAUTH_APPURL: "https://auth.${DOMAIN}"
+      TINYAUTH_AUTH_USERS: "${TINYAUTH_AUTH_USERS}"
+      TINYAUTH_SECRET: "${TINYAUTH_SECRET}"
+      TINYAUTH_AUTH_SESSIONEXPIRY: "${TINYAUTH_AUTH_SESSION_EXPIRY_SEC:-604800}"
+      TINYAUTH_DATABASE_PATH: "/data/tinyauth.db"
+      TINYAUTH_ANALYTICS_ENABLED: "false"
+      TINYAUTH_LOG_LEVEL: "info"
+    volumes:
+      - ${DOCKER_VOLUMES_ROOT:-./.docker-volumes}/tinyauth/data:/data
+    labels:
+      - "caddy=http://auth.${DOMAIN}"
+      - "caddy.reverse_proxy={{upstreams 3000}}"
+    networks: [app_net]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+```
+
+---
+
+### Ops Services — Chuyển sang forward_auth
+
+#### [MODIFY] [compose.ops.yml](file:///h:/nodejs-tester/dockerstackds2api/docker-compose/compose.ops.yml)
+
+Thay thế `basic_auth` labels trên **4 services** (dozzle, filebrowser, webssh, webssh-windows):
+
+```diff
+  # Dozzle
+-     - "caddy.basic_auth=/*"
+-     - "caddy.basic_auth.${CADDY_AUTH_USER:-admin}=${CADDY_AUTH_HASH}"
++     - "caddy.import=tinyauth_forwarder *"
+
+  # Filebrowser
+-     - "caddy.basic_auth=/*"
+-     - "caddy.basic_auth.${CADDY_AUTH_USER:-admin}=${CADDY_AUTH_HASH}"
++     - "caddy.import=tinyauth_forwarder *"
+
+  # WebSSH (Linux)
+-     - "caddy.basic_auth=/*"
+-     - "caddy.basic_auth.${CADDY_AUTH_USER:-admin}=${CADDY_AUTH_HASH}"
++     - "caddy.import=tinyauth_forwarder *"
+
+  # WebSSH (Windows)
+-     - "caddy.basic_auth=/*"
+-     - "caddy.basic_auth.${CADDY_AUTH_USER:-admin}=${CADDY_AUTH_HASH}"
++     - "caddy.import=tinyauth_forwarder *"
+```
+
+---
+
+### Deploy Service — Chuyển sang forward_auth
+
+#### [MODIFY] [compose.deploy.yml](file:///h:/nodejs-tester/dockerstackds2api/docker-compose/compose.deploy.yml)
+
+```diff
+  # deploy-code
+-     - "caddy.basic_auth=/*"
+-     - "caddy.basic_auth.${CADDY_AUTH_USER:-admin}=${CADDY_AUTH_HASH}"
++     - "caddy.import=tinyauth_forwarder *"
+```
+
+---
+
+### App Service — Cập nhật comments
+
+#### [MODIFY] [compose.apps.yml](file:///h:/nodejs-tester/dockerstackds2api/compose.apps.yml)
+
+Cập nhật commented-out basic_auth → tinyauth pattern:
+```diff
+-     # - "caddy.basic_auth=/*"
+-     # - "caddy.basic_auth.${CADDY_AUTH_USER:-admin}=${CADDY_AUTH_HASH}"
++     # - "caddy.import=tinyauth_forwarder *"
+```
+
+---
+
+### Environment Variables
+
+#### [MODIFY] [.env.example](file:///h:/nodejs-tester/dockerstackds2api/.env.example)
+
+Thêm section mới cho Tinyauth và cập nhật section CADDY AUTH:
+
+```ini
+# ================================================================
+#  TINYAUTH — Session-based auth gateway (replaces Caddy basic_auth)
+# ================================================================
+# Auth users in format: user:bcrypt_hash (comma-separated for multiple)
+# Generate hash with:
+#   docker run --rm ghcr.io/steveiliop56/tinyauth:v5 tinyauth hash -p "YourPassword"
+# Example: admin:$2a$14$abc123...
+TINYAUTH_AUTH_USERS=admin:$2a$14$replace-this-with-a-real-bcrypt-hash
+
+# Secret key for signing session cookies (32+ chars random string)
+# Generate with: openssl rand -hex 32
+TINYAUTH_SECRET=replace-with-random-hex-string-64-chars
+
+# Session expiry in seconds (default: 604800 = 7 days)
+TINYAUTH_AUTH_SESSION_EXPIRY_SEC=604800
+```
+
+---
+
+### Cloudflared — Thêm auth subdomain
+
+#### [MODIFY] [config.yml](file:///h:/nodejs-tester/dockerstackds2api/cloudflared/config.yml)
+
+```diff
+  ingress:
++   - hostname: auth.dockerstackds2api.dpdns.org
++     service: http://caddy:80
+    - hostname: dockerstackds2api.dpdns.org
+      service: http://caddy:80
+```
+
+---
+
+### Orchestrator Script
+
+#### [MODIFY] [dc.sh](file:///h:/nodejs-tester/dockerstackds2api/docker-compose/scripts/dc.sh)
+
+Thêm tinyauth volume directory vào `prepare_docker_volume_dirs()`:
+```diff
+    mkdir -p \
+      "$volume_root/app/data" \
+      "$volume_root/app/logs" \
+      "$volume_root/caddy/data" \
+      "$volume_root/caddy/config" \
++     "$volume_root/tinyauth/data" \
+      "$volume_root/filebrowser/database" \
+```
+
+---
+
+### Environment Variables — Thêm Cloudflare hostname
+
+#### [MODIFY] [.env.example](file:///h:/nodejs-tester/dockerstackds2api/.env.example)
+
+Thêm hostname/service cho auth vào danh sách Cloudflare Tunnel:
+```diff
+  CLOUDFLARED_TUNNEL_HOSTNAME_6=deploy.${DOMAIN}
++ CLOUDFLARED_TUNNEL_HOSTNAME_7=auth.${DOMAIN}
+
+  CLOUDFLARED_TUNNEL_SERVICE_6=http://caddy:80
++ CLOUDFLARED_TUNNEL_SERVICE_7=http://caddy:80
+```
+
+---
+
+## Verification Plan
+
+### Automated Tests
+1. `bash docker-compose/scripts/dc.sh config` — kiểm tra compose config hợp lệ, không lỗi syntax
+2. Kiểm tra Caddy generated config có snippet `tinyauth_forwarder` và `forward_auth` directive
+3. Kiểm tra tinyauth container healthcheck pass
+
+### Manual Verification
+1. Truy cập `https://dozzle.dockerstackds2api.dpdns.org` → redirect tới login page
+2. Đăng nhập → redirect về dozzle, session cookie được set
+3. Đóng browser, mở lại → vẫn đăng nhập (không hỏi lại password)
+4. Restart container Caddy + Tinyauth → vẫn đăng nhập (session persist trong SQLite)
+5. Kiểm tra tất cả protected services: filebrowser, webssh, deploy-code
